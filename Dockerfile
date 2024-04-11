@@ -23,7 +23,6 @@ RUN apt-get update && apt-get install -y curl
 RUN git clone -b dev https://github.com/CDCgov/tostadas.git
 ENV HOME /tostadas
 WORKDIR $HOME
-RUN git checkout ec0bd38
 
 RUN curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh
 RUN bash Mambaforge-$(uname)-$(uname -m).sh -b -p $HOME/mambaforge
@@ -38,4 +37,4 @@ COPY tostadas_azure.config /tostadas/
 COPY submission_config.yml /tostadas/bin/config_files
 RUN nextflow -version
 
-ENTRYPOINT ["tail", "-f", "/dev/null"]
+# ENTRYPOINT ["tail", "-f", "/dev/null"]
