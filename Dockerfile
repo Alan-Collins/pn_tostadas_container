@@ -16,9 +16,7 @@ ENV NXF_HOME="/root/.nextflow"
 
 RUN mkdir -p /root/.nextflow/framework/23.10.1
 RUN curl -k -L -o  /root/.nextflow/framework/23.10.1/nextflow-23.10.1-one.jar https://www.nextflow.io/releases/v23.10.1/nextflow-23.10.1-one.jar 
-# Set the working directory inside the container
-RUN apt-get update && apt-get install -y curl 
-# RUN conda install -y gxx_linux-64 curl
+
 # Download tostadas
 RUN git clone -b dev https://github.com/CDCgov/tostadas.git
 ENV HOME /tostadas
@@ -36,5 +34,8 @@ WORKDIR /tostadas
 COPY tostadas_azure.config /tostadas/
 COPY submission_config.yml /tostadas/bin/config_files
 RUN nextflow -version
+
+# Install csv to xlsx converter
+RUN apt-get update && apt-get install -y --no-install-recommends gnumeric
 
 # ENTRYPOINT ["tail", "-f", "/dev/null"]
