@@ -31,7 +31,7 @@ ENV PATH="/tostadas/mambaforge/envs/tostadas_local/bin:$PATH"
 
 # Copy necessary files to the container
 WORKDIR /tostadas
-COPY tostadas_azure.config /tostadas/
+COPY tostadas_azure.config run_tostadas.sh /tostadas/
 COPY submission_config.yml /tostadas/bin/config_files
 RUN nextflow -version
 
