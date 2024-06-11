@@ -93,27 +93,63 @@ process UPDATE_SUBMISSION {
     def test_flag = params.submission_prod_or_test == 'test' ? '--test' : ''
     script:
     """
-    repeat="TRUE"
-    while [[ \$repeat == "TRUE" ]]; do
-        submission.py check_submission_status \
-            --organism $params.organism \
-            --submission_dir .  \
-            --submission_name $submission_output $test_flag
-        
-        /tostadas/get_accessions.py \
-            --sra $submission_output/SRA/report.xml \
-            --biosample $submission_output/BIOSAMPLE/report.xml \
-            --out accessions.json
+    mv submission_outputs/* .
+    rm -r submission_outputs
+    for sub_name in \$(ls -d .); do
+        cp "\$sub_name"_submission_log.csv \$sub_name
+        repeat="TRUE"
+        while [[ \$repeat == "TRUE" ]]; do
+            /tostadas/bin/submission.py check_submission_status \
+                --organism $params.organism \
+                --submission_dir \$sub_name  \
+                --submission_name \$sub_name $test_flag
 
-        # output that a QC failed if any accessions didn't pass
-        grep "FAIL" *_accessions.json && QC=FAIL || QC=PASS
+            /tostadas/get_accessions.py \
+                --sra \$sub_name/submission_files/SRA/report.xml \
+                --biosample \$sub_name/submission_files/BIOSAMPLE/report.xml \
+                --out "\$sub_name"_accessions.json
 
-        if [[ \$QC == "FAIL" ]]; then
-            sleep $wait_time
-        else
-            repeat="FALSE"
-        fi
+            # output that a QC failed if any accessions didn't pass
+            grep "FAIL" "\$sub_name"_accessions.json && QC=FAIL || QC=PASS
+
+            if [[ \$QC == "FAIL" ]]; then
+                sleep $wait_time
+            else
+                repeat="FALSE"
+            fi
+        done
+    done
     """
+    
+    // """
+    // cp submission_outputs/*/submission_config.yml submission_outputs
+    // for dir in \$(ls -d submission_outputs/*/); do
+    //     sub_name=\${dir%/}
+    //     sub_name=\${sub_name##*/}
+    //     cp submission_outputs/"\$sub_name"_submission_log.csv \$dir
+    //     repeat="TRUE"
+    //     while [[ \$repeat == "TRUE" ]]; do
+    //         /tostadas/bin/submission.py check_submission_status \
+    //             --organism $params.organism \
+    //             --submission_dir submission_outputs/\$sub_name  \
+    //             --submission_name \$sub_name $test_flag
+
+    //         /tostadas/get_accessions.py \
+    //             --sra \$dir/submission_files/SRA/report.xml \
+    //             --biosample \$dir/submission_files/BIOSAMPLE/report.xml \
+    //             --out "\$sub_name"_accessions.json
+
+    //         # output that a QC failed if any accessions didn't pass
+    //         grep "FAIL" "\$sub_name"_accessions.json && QC=FAIL || QC=PASS
+
+    //         if [[ \$QC == "FAIL" ]]; then
+    //             sleep $wait_time
+    //         else
+    //             repeat="FALSE"
+    //         fi
+    //     done
+    // done
+    // """
 
     
 } 
