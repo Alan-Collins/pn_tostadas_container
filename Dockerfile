@@ -21,6 +21,7 @@ RUN curl -k -L -o  /root/.nextflow/framework/23.10.1/nextflow-23.10.1-one.jar ht
 RUN git clone -b dev https://github.com/CDCgov/tostadas.git
 ENV HOME /tostadas
 WORKDIR $HOME
+RUN git checkout 6187938
 
 RUN curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh
 RUN bash Mambaforge-$(uname)-$(uname -m).sh -b -p $HOME/mambaforge
@@ -31,11 +32,14 @@ ENV PATH="/tostadas/mambaforge/envs/tostadas_local/bin:$PATH"
 
 # Copy necessary files to the container
 WORKDIR /tostadas
-COPY tostadas_azure.config run_tostadas.sh /tostadas/
+COPY tostadas_azure.config tostadas_azure_test.config get_accessions.py /tostadas/
 COPY submission_config.yml /tostadas/bin/config_files
-RUN nextflow -version
+COPY main.nf /
 
+
+WORKDIR /
 # Install csv to xlsx converter
 RUN apt-get update && apt-get install -y --no-install-recommends gnumeric
 
-# ENTRYPOINT ["tail", "-f", "/dev/null"]
+# saves time. Otherwise every run takes time initializing nextflow
+RUN nextflow -version
