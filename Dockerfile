@@ -34,7 +34,7 @@ ENV PATH="/tostadas/mambaforge/envs/tostadas_local/bin:$PATH"
 WORKDIR /tostadas
 COPY tostadas_azure.config tostadas_azure_test.config get_accessions.py /tostadas/
 COPY submission_config.yml /tostadas/bin/config_files
-COPY main.nf /
+COPY main.nf convert_csv.py /
 
 
 WORKDIR /
