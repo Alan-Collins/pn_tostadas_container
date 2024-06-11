@@ -3,8 +3,6 @@
 nextflow.enable.dsl=2
 nextflow.preview.recursion=true
 
-include {UPDATE_SUBMISSION} from './tostadas/modules/local/update_submission/'
-
 params.output_dir = "/outputs"
 
 // workflow wGET_ACCESSIONS{
@@ -95,21 +93,25 @@ process UPDATE_SUBMISSION {
     def test_flag = params.submission_prod_or_test == 'test' ? '--test' : ''
     script:
     """
+    repeat="TRUE"
+    while [[ \$repeat == "TRUE" ]]; do
         submission.py check_submission_status \
             --organism $params.organism \
             --submission_dir .  \
             --submission_name $submission_output $test_flag
         
         /tostadas/get_accessions.py \
-            --sra \$dir/submission_files/SRA/report.xml \
-            --biosample \$dir/submission_files/BIOSAMPLE/report.xml \
-            --out "\$acc"_accessions.json
+            --sra $submission_output/SRA/report.xml \
+            --biosample $submission_output/BIOSAMPLE/report.xml \
+            --out accessions.json
 
         # output that a QC failed if any accessions didn't pass
         grep "FAIL" *_accessions.json && QC=FAIL || QC=PASS
 
-        if [[ $QC == "FAIL" ]]; then
+        if [[ \$QC == "FAIL" ]]; then
             sleep $wait_time
+        else
+            repeat="FALSE"
         fi
     """
 
@@ -162,9 +164,7 @@ workflow {
     // wGET_ACCESSIONS
     //     .recurse(RUN_TOSTADAS.out.submission_outputs, RUN_TOSTADAS.out.submission_log)
     //     .until { it -> it.out.QC == "PASS" }
-    UPDATE_SUBMISSION
-        .recurse(300, RUN_TOSTADAS.out.submission_outputs, RUN_TOSTADAS.out.submission_log)
-        .until { it -> it.out.QC == "PASS" }
+    UPDATE_SUBMISSION(300, RUN_TOSTADAS.out.submission_outputs, RUN_TOSTADAS.out.submission_log)
 }
 
 
