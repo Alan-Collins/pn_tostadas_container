@@ -32,7 +32,9 @@ MANDATORY_FIELDS = {
     "sex": "missing",
     "age": "missing",
     "race": "missing",
-    "ethnicity": "missing"
+    "ethnicity": "missing",
+    "isolate": "missing",
+    "strain": "missing",
 }
 
 data = defaultdict(dict)
