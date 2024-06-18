@@ -20,6 +20,8 @@ process CONVERT_CSV {
 }
 
 process RUN_TOSTADAS {
+    errorStrategy 'finish'
+
     input:
     path metadata
     path meta_json
