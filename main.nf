@@ -36,8 +36,8 @@ process RUN_TOSTADAS {
     --output_dir ./ \
     --submission --annotation false --genbank false --sra true --bacteria \
     --fastq_path /tostadas/ --fasta_path /tostadas/ --bakta_db_path /tostadas/ \
-    --meta_path $metadata \
-    --custom_fields_file $meta_json \
+    --meta_path \$(pwd)/$metadata \
+    --custom_fields_file \$(pwd)/$meta_json \
     --submission_config /tostadas/bin/config_files/submission_config.yml \
     -c /tostadas/tostadas_azure_test.config
     """
@@ -87,5 +87,5 @@ process UPDATE_SUBMISSION {
 workflow {
     CONVERT_CSV(params.reads)
     RUN_TOSTADAS(CONVERT_CSV.out.xlsx.flatten(), CONVERT_CSV.out.metadata_json)
-    UPDATE_SUBMISSION(300, RUN_TOSTADAS.out.submission_outputs, RUN_TOSTADAS.out.submission_log)
+    UPDATE_SUBMISSION(300, RUN_TOSTADAS.out.submission_outputs)
 }
