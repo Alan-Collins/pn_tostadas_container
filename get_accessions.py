@@ -67,12 +67,21 @@ def get_acc_from_xml(xml_file: str, file_id: str):
         if match is not None:
             accession = match.group(0)
             return accession, qc, error
+    
+    # Finally, check for an error message
+    obj = root.find(".//Message")
+    if obj is not None:
+        if obj.get("severity") == "error-stop":
+            error = obj.text
+            qc = "FAIL"
+        return accession, qc, error
 
     accession = ""
     qc = "FAIL"
     error = f"Accession not found in {file_id} XML document"
+    sys.stderr.write(error)
+    sys.exit(2)
     
-    return accession, qc, error
 
 
 def main():
