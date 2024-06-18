@@ -92,8 +92,8 @@ def main():
 
     output_data = {
         "metadata": {
-            "SRA": sra_acc,
-            "BIOSAMPLE": biosample_acc
+            "SRR_ID": sra_acc,
+            "NCBI_ACCESSION": biosample_acc
         },
         "qc": {
             "result": qc,
