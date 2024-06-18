@@ -37,93 +37,106 @@ MANDATORY_FIELDS = {
     "strain": "missing",
 }
 
-data = defaultdict(dict)
 
-custom_fields = []
-
-with open(sys.argv[1]) as fin:
-    metadata_cols, *samples = [i.strip().split(",")[1:] for i in fin.readlines() if i != ""]
+def read_mapping_file(mapping_file):
+    with open(mapping_file) as fin:
+        metadata_cols, *samples = [i.strip().split(",") for i in fin.readlines() if i != ""]
     # replace file mapping headers with tostadas headers
-    metadata_cols[0] = "illumina_sra_file_path_1"
-    metadata_cols[1] = "illumina_sra_file_path_2"
+    metadata_cols[1] = "illumina_sra_file_path_1"
+    metadata_cols[2] = "illumina_sra_file_path_2"
+    
+    return metadata_cols, samples
 
-# reorganize columns for default layout
-for samp in samples:
-    s_id = samp[2]
-    for header, fld in zip(metadata_cols, samp):
-        data[header][s_id] = fld
-        
-        # check fields with mandatory content or format
-        # First check fields which should duplicate data from other fields
-        if header == "isolate" and fld == "":
-            data[header][s_id] = data["ncbi-spuid"][s_id]
-            continue
-        if header == "collection_date" and re.match(r"^\\d{4}\$", fld):
-            # fld is just the year
-            data[header][s_id] += "-01"
-        if fld == "" and header in MANDATORY_FIELDS:
-            data[header][s_id] = MANDATORY_FIELDS[header]
 
-# Add missing mandatory fields
-for header, value in MANDATORY_FIELDS.items():
+def process_mapping_data(metadata_cols, samples):
+    data = defaultdict(dict)
+    # reorganize columns for default layout
     for samp in samples:
-        s_id = samp[2]
-        if s_id not in data[header]:
-            data[header][s_id] = value
-        if data[header][s_id] == "":
-            data[header][s_id] = value
+        s_id = samp[3]
+        for header, fld in zip(metadata_cols[1:], samp[1:]):
+            data[header][s_id] = fld
+            
+            # check fields with mandatory content or format
+            # First check fields which should duplicate data from other fields
+            if header == "isolate" and fld == "":
+                data[header][s_id] = data["ncbi-spuid"][s_id]
+                continue
+            if header == "collection_date" and re.match(r"^\\d{4}\$", fld):
+                # fld is just the year
+                data[header][s_id] += "-01"
+            if fld == "" and header in MANDATORY_FIELDS:
+                data[header][s_id] = MANDATORY_FIELDS[header]
 
-out_lines = [[], []] + [[]] * len(samples)
-
-for major, minor in DEFAULT_LAYOUT.items():
-    # first populate header lines
-    out_lines[0] += [major] + [""] * (len(minor)-1) # pad columns to include all minor headers
-    out_lines[1] += minor
-
-    # then add sample data
-    for n, sample in enumerate(samples):
-        s_id = sample[2]
-        for header in minor:
-            try:
-                out_lines[2+n].append(data[header].get(s_id, ''))
-            except KeyError:
-                out_lines[2+n].append('')
-
-                
-# Identify custom fields
-DEFAULT_FIELDS = set(out_lines[1])
-
-custom_fields = [fld for fld in metadata_cols if fld not in DEFAULT_FIELDS and fld != ""]
+    # Add missing mandatory fields
+    for header, value in MANDATORY_FIELDS.items():
+        for samp in samples:
+            s_id = samp[3]
+            if s_id not in data[header]:
+                data[header][s_id] = value
+            if data[header][s_id] == "":
+                data[header][s_id] = value
+    
+    return data
 
 
-# Add custom fields into layout
-out_lines[0] += [""]*len(custom_fields)
-out_lines[1] += custom_fields
-for n, sample in enumerate(samples):
-    s_id = sample[2]
-    for header in custom_fields:
-        try:
-            out_lines[2+n].append(data[header].get(s_id, ''))
-        except KeyError:
-            out_lines[2+n].append('')
+def generate_header_and_custom_fields(metadata_cols):
+    header = [[], []]
 
-# Convert metadata to xlsx
-metadata_string = "\\n".join([",".join(line) for line in out_lines] + [""])
+    for major, minor in DEFAULT_LAYOUT.items():
+        # first populate header lines
+        header[0] += [major] + [""] * (len(minor)-1) # pad columns to include all minor headers
+        header[1] += minor
 
-command = f"ssconvert <(printf '{metadata_string}') metadata.xlsx"
+    # Identify custom fields
+    default_fields = set(header[1])
 
-subprocess.run(command, shell=True, executable="/bin/bash")
+    custom_fields = [fld for fld in metadata_cols if fld not in default_fields and fld != ""]
+    # Add custom fields into layout
+    header[0] += [""]*len(custom_fields)
+    header[1] += custom_fields
 
-# Write metadata fields configuration json
+    return header, custom_fields
 
-meta_json = {
-    fld: {
-        "type": "String",
-        "samples": ["All"],
-        "replace_empty_with": "Missing",
-        "new_field_name": ""
-    } for fld in custom_fields
-}
 
-with open("metadata_fields.json", "w") as fout:
-    json.dump(meta_json, fout, indent=4)
+def make_sample_mapping(pulsenet_id, tostadas_id, header, data):
+    sample_line = []
+    for minor in header[1]:
+            sample_line.append(data[minor].get(tostadas_id, ''))
+    
+    out_lines = header + [sample_line]
+
+    # Convert metadata to xlsx
+    metadata_string = "\\n".join([",".join(line) for line in out_lines] + [""])
+
+    command = f"ssconvert <(printf '{metadata_string}') {pulsenet_id}.xlsx"
+
+    subprocess.run(command, shell=True, executable="/bin/bash")
+
+
+def write_json(custom_fields):
+    meta_json = {
+        fld: {
+            "type": "String",
+            "samples": ["All"],
+            "replace_empty_with": "Missing",
+            "new_field_name": ""
+        } for fld in custom_fields
+    }
+
+    with open("metadata_fields.json", "w") as fout:
+        json.dump(meta_json, fout, indent=4)
+
+def main():
+    metadata_cols, samples = read_mapping_file(sys.argv[1])
+    data = process_mapping_data(metadata_cols, samples)
+    header, custom_fields = generate_header_and_custom_fields(metadata_cols)
+    for sample in samples:
+        pulsenet_id = sample[0]
+        tostadas_id = sample[3]
+        make_sample_mapping(pulsenet_id, tostadas_id, header, data)
+    
+    write_json(custom_fields)
+
+
+if __name__ == "__main__":
+    main()
