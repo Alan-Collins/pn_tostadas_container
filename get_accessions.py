@@ -39,7 +39,8 @@ def get_acc_from_xml(xml_file: str, file_id: str):
         accession = ""
         qc = "FAIL"
         error = f"XML file not found for {file_id}"
-        return accession, qc, error
+        sys.stderr.write(error)
+        sys.exit(2)
     
     tree = ET.parse(xml_file)
     root = tree.getroot()
