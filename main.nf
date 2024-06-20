@@ -43,7 +43,7 @@ process RUN_TOSTADAS {
     --submission_config /tostadas/bin/config_files/submission_config.yml \
     -c /tostadas/tostadas_azure_test.config
 
-    sub_name=\$(ls -d submission_outputs/*)
+    sub_name=\$(ls -d submission_outputs/*/)
     sub_name=\${sub_name%/}
     """
 }
