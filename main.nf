@@ -27,7 +27,7 @@ process RUN_TOSTADAS {
     path meta_json
 
     output:
-    tuple env(sample), path("submission_outputs/*"), path("submission_outputs/combined_submission_log.csv"), emit: submission_outputs
+    tuple env(sample), env(sub_name), emit: submission
 
     script:
     """
@@ -42,6 +42,9 @@ process RUN_TOSTADAS {
     --custom_fields_file \$(pwd)/$meta_json \
     --submission_config /tostadas/bin/config_files/submission_config.yml \
     -c /tostadas/tostadas_azure_test.config
+
+    sub_name=\$(ls -d submission_outputs/*)
+    sub_name=\${sub_name%/}
     """
 }
 
@@ -51,37 +54,19 @@ process UPDATE_SUBMISSION {
     errorStrategy { sleep(wait_time * 1000); task.exitStatus == 2 ? 'retry' : 'terminate' }
     maxRetries 100
 
-    conda (params.enable_conda ? params.env_yml : null)
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'staphb/tostadas:latest' : 'staphb/tostadas:latest' }"
-
     input:
         val wait_time 
-        tuple val(sample), path(submission_output), path(submission_log)
+        tuple val(sample), val(sub_name)
+        val submission_type
 
     output:
         path "PipelineProcessOutputs.json"
     
-    def test_flag = params.submission_prod_or_test == 'test' ? '--test' : ''
-
     script:
     """
-    # mv submission_outputs/* .
-    # rm -r submission_outputs
-    cp /tostadas/bin/config_files/submission_config.yml .
-    
-    sub_name=\$(ls -d */)
-    sub_name=\${sub_name%/}
-    cp "\$sub_name"_submission_log.csv \$sub_name/
-
-    /tostadas/bin/submission.py check_submission_status \
-        --organism $params.organism \
-        --submission_dir \$sub_name/  \
-        --submission_name \$sub_name $test_flag
-
     /tostadas/get_accessions.py \
-        --sra \$sub_name/submission_files/SRA/report.xml \
-        --biosample \$sub_name/submission_files/BIOSAMPLE/report.xml \
+        --sample-name $sub_name \
+        --submission-type $submission_type \
         --out PipelineProcessOutputs.json
     """    
 } 
@@ -89,5 +74,5 @@ process UPDATE_SUBMISSION {
 workflow {
     CONVERT_CSV(params.reads)
     RUN_TOSTADAS(CONVERT_CSV.out.xlsx.flatten(), CONVERT_CSV.out.metadata_json)
-    UPDATE_SUBMISSION(300, RUN_TOSTADAS.out.submission_outputs)
+    UPDATE_SUBMISSION(300, RUN_TOSTADAS.out.submission, "Test")
 }

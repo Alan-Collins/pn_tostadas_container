@@ -6,19 +6,24 @@ import os
 import json
 import re
 import sys
+import yaml
+import os
+import ftplib
 
+SEQSENDER_CONFIG = "/tostadas/bin/config_files/seqsender_main_config.yaml"
+SUBMISSION_CONFIG = "/tostadas/bin/config_files/submission_config.yml"
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--sra",
-        help="xml output file from sra submission",
+        "--sample-name",
+        help="name of sample submitted to NCBI",
         metavar="",
         required=True
         )
     parser.add_argument(
-        "--biosample",
-        help="xml output file from biosample submission",
+        "--submission-type",
+        help="Test or Production",
         metavar="",
         required=True
         )
@@ -30,6 +35,42 @@ def parse_args():
         )
     return parser.parse_args()
 
+
+def retrieve_report(sample_name: str, submission_type:str, database: str):
+    with open(SEQSENDER_CONFIG, "r") as f:
+        main_config = yaml.load(f, Loader=yaml.BaseLoader)["SUBMISSION_PORTAL"]
+
+    FTP_HOST = main_config["PORTAL_NAMES"]["NCBI"]["FTP_HOST"]
+
+    with open(SUBMISSION_CONFIG) as fin:
+        config_dict = yaml.load(fin, Loader=yaml.BaseLoader).get("Submission")["NCBI"]
+
+    ncbi_submission_name = sample_name + "_" + database
+
+    ftp = ftplib.FTP(FTP_HOST)
+    ftp.login(user=config_dict["Username"], passwd=config_dict["Password"])
+
+    # CD into submit dir
+    ftp.cwd('submit')
+
+    # CD to to test/production folder
+    ftp.cwd(submission_type)
+
+    # Check if submission name exists
+    if ncbi_submission_name not in ftp.nlst():
+        print("There is no submission with the name of '"+ ncbi_submission_name +"' on NCBI FTP server.", file=sys.stderr)
+        print("Please try the submission again.", file=sys.stderr)
+        sys.exit(1)
+    # CD to submission folder
+    ftp.cwd(ncbi_submission_name)
+    # Check if report.xml exists
+    if "report.xml" in ftp.nlst():
+        print("Pulling down report.xml", file=sys.stdout)
+        report_file = f"{database}_report.xml"
+        with open(report_file, 'wb') as f:
+            ftp.retrbinary('RETR report.xml', f.write, 262144)
+        return report_file
+    
 
 def get_acc_from_xml(xml_file: str, file_id: str):
     accession = None
@@ -87,8 +128,10 @@ def get_acc_from_xml(xml_file: str, file_id: str):
 
 def main():
     args = parse_args()
-    sra_acc, sra_qc, sra_error = get_acc_from_xml(args.sra, "SRA")
-    biosample_acc, biosample_qc, biosample_error = get_acc_from_xml(args.biosample, "Biosample")
+    sra_report = retrieve_report(args.sample_name, args.submission_type, "SRA")
+    sra_acc, sra_qc, sra_error = get_acc_from_xml(sra_report, "SRA")
+    biosample_report = retrieve_report(args.sample_name, args.submission_type, "BIOSAMPLE")
+    biosample_acc, biosample_qc, biosample_error = get_acc_from_xml(biosample_report, "Biosample")
 
     qc = "PASS"
     for res in [sra_qc, biosample_qc]:
